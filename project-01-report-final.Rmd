@@ -1,0 +1,168 @@
+---
+title: "project01-report-aayush-gupta"
+author: "Aayush Gupta"
+date: "10/7/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Ban Ki-Moon, Secretary-General of the United Nations, once famously said, "we are the first generation to be able to end poverty, and the last generation that can take steps to avoid the worst impacts of climate change." To understand this phenomenon, it is first important to define what climate is exactly. While weather refers to the short-term atmospheric conditions in a particular area, climate can be considered a long-term forecast of the weather conditions in a geographic region. As such, weather is quite variable, and climate is relatively stable, mainly determined by temperature and precipitation. While fluctuations in climate have been a natural part of Earth's 4.6 billion year history, with the planet undergoing periods of immense heat and frigid ice ages, climate change refers to the recent observation that man-made processes may be contributing to an unusual warming of the planet. As humans release more and more "greenhouse" gases such as carbon dioxide and methane into the atmosphere, a consequence of burning "fossil fuels" in industrial pathways, Earth's climate will continue to change, leading to more "extreme events" such as rapid sea level rise and weather-induced natural disasters, affecting millions on the planet.
+
+Currently, researchers are closely studying the effects of climate change on hurricanes. These violent storms, also referred to as typhoons or cyclones depending on their geographic origin, use "warm, moist air as fuel" (NASA 2019) by using the pressure gradient formed to create a "whole system of clouds and wind [which] spins and grows, fed by the ocean's heat and water evaporating from the surface" (NASA 2019). Hurricanes can be classified based on their wind speed using the Saphire-Simpson scale and range from category 1 hurricanes (74-95 mph winds) to category 5 hurricanes (wind speeds exceeding 157 mph). Additionally, it is important to note that because of their warm weather requirements, hurricane season in the Atlantic typically occurs between the months of June and November, although it is possible for hurricanes to form outside this timeframe.
+
+With this context established, my research project seeks to use data from the "International Best Track Archive for Climate Stewardships" (IBTrACS) website in order to answer questions about changes in hurricane frequency, strength, and timing between the years 1970 and 2019 inclusive.
+
+```{r}
+library(tidyverse)
+library(lubridate)
+library(gganimate)
+library(maps)
+```
+
+I first loaded in two packages, tidyverse and lubridate, into my RMD fil. While tidyverse contains dplyr and ggplot, important libraries that will be used to manipulate and plot the data, lubridate will be useful for mutating our dataframe to add a month column, using data parsed from a pre-existing column.
+
+Once these packages were available for use, I downloaded the IBTrACS v04 file and took a look at the data in order to understand what each of the columns represented. This is an important part of the Data Analysis Cycle (DAP) because without context, it can be hard to figure out how to manipulate the information you have in order to answer your research questions. Furthermore, by taking a close look at the data, you can make sure outliers and faulty values (such as empty cells) are fixed before beginning your analysis.
+
+```{r}
+
+names = c('SID', 'SEASON', 'NUMBER', 'BASIN', 'SUBBASIN', 'NAME', 'ISO_TIME',
+              'NATURE', 'LAT', 'LON', 'WMO_WIND', 'WMO_PRES', 'WMO_AGENCY', 'TRACK_TYPE',
+              'DIST2LAND', 'LANDFALL')
+
+types = c('character', 'integer', 'integer', 'character', 'character', 'character',
+              'character', 'character', 'double', 'double', 'integer', 'integer',
+              'character', 'character', 'integer', 'integer')
+              
+          
+dat = read.csv(file = '/Users/aayus/Desktop/stat133/ibtracs.NA.list.v04r00.csv',
+               colClasses = c(types, rep('NULL', 147)),
+               skip = 77876,
+               stringsAsFactors = FALSE,
+               na = '')
+
+colnames(dat) = names
+dat
+
+```
+
+Next, I wrote code to import only the first columns of the dataframe (from SID to LANDFALL). Column names and data types were specified and applied to the table, which I labeled as "dat."
+
+```{r}
+dat$ISO_TIME = as.POSIXct(dat$ISO_TIME)
+dat$MONTH = lubridate::month(dat$ISO_TIME)
+str(dat, vec.len = 1)
+
+dat
+```
+
+It is important to note that while the 'ISO_TIME' column does offer information about when a particular hurricane occurred, it presents it in a format that makes filtering hard. This makes data cleaning crucial to do before we begin to analyze what months hurricanes are occurring at during the year. As such, I used the above function to extract the month from each data and added it into a separate column.
+
+Research Q1: Are hurricanes becoming more frequent?
+
+```{r}
+# C1) Are hurricanes becoming more frequent?
+hurricanes_per_year = count(filter(dat, SEASON <= 2019 & WMO_WIND >= 64), SEASON)
+hurricanes_per_year
+ggplot(hurricanes_per_year) + geom_point(aes(x = SEASON, y = n)) + ggtitle('hurricanes per year from 1970 to 2019')
+
+```
+To answer this question, we need to first manipulate the data so that only the hurricanes in the designated time frame are included. To do this, I decided to use the 'filter' function found in the dplyr package which would only list rows that met certain input criteria. Since we want storms between 1970 and 2019, and since the dataset starts at 1970, I wrote a filter command on the dataset to only include storms that occurred during or before 2019 (SEASON <= 2019). Furthermore, it is important to note that the dat dataframe contains information about ALL types of storms, not just hurricanes. In order to be classified as a hurricane, the storm must have wind speed exceeding 63 mph. Consequently, I added another condition to the filter to meet this condition (WMO_WIND >= 64) where WMO_WIND refers to the wind speed of a storm. Now that we have the correct data selected, the count function can be called in order to give a numeric value for the number of storms that occurred in each year. To create a visual representation of this data, I used the ggplot and geom_point functions, with parameters setting the x-axis to year and y-axis to number, resulting in a scatterplot. While a bargraph would have also worked to answer this question, I decided to go with a scatterplot because I wanted to see if there was a positive correlation between year and number of hurricanes. As seen above, there appears to be a slight, positive, and linear correlation between these two variables, allowing us to conclude that hurricanes have increased in frequency between the years of 1970 and 2019.
+
+Research Q2: Are hurricanes getting stronger?
+
+```{r}
+# C2) Are hurricanes getting stronger?
+hurricane_strength_over_time = summarize(group_by(filter(dat, SEASON <= 2019 & WMO_WIND >= 64), SEASON), average_wind = mean(WMO_WIND, na.rm = TRUE))
+hurricane_strength_over_time
+
+ggplot(hurricane_strength_over_time) + geom_point(aes(x = SEASON, y = average_wind)) + ggtitle('average wind speed of hurricanes from 1970 to 2019')
+
+```
+Just like the previous question, I needed to filter the dataframe so that it contained only hurricanes (wind > 63) that occurred before 2019. As such, I used the filter function with the same parameters (SEASON <= 2019 and WMO_WIND >= 64). Looking back, this is a inefficient since I wrote the same code in multiple questions. To solve this, I would instead create a new variable that contains the dataframe that results from applying the filter function. That way, this variable can be called whenever needed, instead of repeating lengthy code. Next, I decided to group the dataframe by SEASON because we need to know how the wind speed of hurricanes changed between 1970 and 2019. Finally, by using the summarize function, with parameter, average_wind = mean(WMO_WIND, na. rm = TRUE), I was able to see a numeric representation of the average wind speed of hurricanes within the designated time period. While this representation of data is certainly suggestive of an increase in strength, a visual plot would help us make a more solid conclusion. I once again decided to create a scatterplot using the ggplot and geom_point functions, with parameters setting the x-axis to SEASON and the y-axis to average_wind so that I could see the correlation between these two variables. As seen above, there appears to be a slight, positive, and linear correlation, allowing us to conclude that hurricanes did indeed increase in strength from 1970 to 2019.
+
+
+Research Q3: Is this claim true? The 2019 atlantic hurricane season had 20 tropical cyclones, of which 18 were named storms.
+
+```{r}
+# C3a) The 2019 Atlantic hurricane season had 20 tropical cyclones, of which 18 were named storm
+storms_in_2019 = count(group_by(filter(dat, SEASON == 2019), SID, NAME))
+storms_in_2019 
+
+# The claim is true, there are 20 tropical cyclones in the 2019 Atlantic Season, and two
+# are not named.
+
+```
+First, we need to find a way to determine whether or not there were 20 hurricanes in the 2019 Atlantic Season. In order to do this, I realized that I could use the filter function to get a dataframe with only storms from the year 2019. It is important to note that wind speed is not relevant in answering this question as we are looking at all tropical cyclones, and not just hurricanes. So, the filter function with parameter SEASON == 2019 was applied. As seen in the data dictionary provided at the start of this project, we need to have both the SID and the Name in order to classify a unique storm. Keeping this in mind, I decided to group the data with both of these parameters and then use the count function so that I could see the number of unique storms that occurred in 2019. From the dataframe above, it is clear that there were indeed 20 tropical cyclones in this calendar year (20 rows) of which two are not named. Therefore, we can say that the claim is true.
+
+Research Q4: Is this claim true? The 2019 atlantic hurricane season had six named storms that achieved hurricane status.
+
+```{r}
+# C3b) The 2019 atlantic hurricane season had six named storms that achieved hurricane status.
+hurricanes_in_2019 = count(group_by(filter(dat, SEASON == 2019 & WMO_WIND >= 64), SID, NAME))
+hurricanes_in_2019
+
+# This claim is false, there are 7 storms that achieved hurricane status in 2019.
+
+```
+Once again, we need to focus in on only hurricanes in the year 2019. To do this, I recycled code from the first two questions in order to filter the dataframe by SEASON == 2019 and WMO_WIND >= 64. As mentioned above, had I known that the same code would need to be used for multiple questions, I would have created a variable and assigned this filtered code to it in order to reduce repetition in my chunks. This dataframe was then grouped by SID and NAME and counted in order to show distinct hurricanes. As can be seen above, there are 7 hurricanes that meet hurricane status (wind > 63 kt) which means that the given claim is incorrect.
+
+Research Q5: Is this claim true? The 2019 Atlantic hurricane season had three named storms
+that intensified into major hurricanes, all of which became Category 5 hurricanes.
+
+```{r}
+# C3c) The 2019 Atlantic hurricane season had three named storms that intensified into major hurricanes, all of which became Category 5 hurricanes.
+storms_in_2019 = filter(dat, SEASON == 2019, WMO_WIND > 137)
+storms = count(group_by(storms_in_2019, SID, NAME))
+storms
+
+# This claim is False, there were just two hurricanes that became category 5 hurricane in the
+# 2019 Atlantic Hurricane Season.
+
+```
+A category 5 storm is defined as one in which winds exceed 137 knots. With this definition in mind, I first filtered the dataframe by SEASON == 2019 and WMO_WIND > 137 in order to only include category 5 hurricanes that occurred in the 2019 Atlantic hurricane season. This new dataframe was assigned to the variable storms_in_2019. Next, I grouped the data by SID and Name in order to only display distinct storms (and applied count function). These data manipulations yielded an output of 2 category 5 storms in 2019, Dorian and Lorenzo, thereby refuting the claim that there were three named category 5 hurricanes in 2019.
+
+Research Q6: Is this claim true? There was one storm in 2019 that formed outside the official hurricane season (recall that the official season goes from June 1 to November 30)
+
+```{r}
+# C3d) There was one storm in 2019 that formed outside the official hurricane season (recall that the official season goes from June 1 to November 30).
+hur19 = filter(dat, SEASON == 2019)
+irregular_storms = count(group_by(filter(hur19, MONTH < 6 | MONTH == 12), NAME))
+irregular_storms
+
+# This claim is correct, there is one storm in 2019 that fell outside normal storm season.
+```
+
+To answer this question, we need to take a look at storms that occurred in the months of January, February, March, April, May, and December of 2019. First, I created a variable called hur19 that includes all storms in 2019 by filtering by SEASON == 2019. Then I added an additional filter with conditions MONTH < 6 or MONTH == 12 to give me the storms that occurred outside of the normal hurricane season. This dataframe was grouped and counted by just NAME in order to find the name of all storms in this period, yielding just Andrea. Consequently, we can conclude that this claim is correct since only one storm occurred outside the official hurricane season.
+
+Research Q6: Is this claim correct? Two storms became Category 5 hurricanes, at least one storm making landfal at Category 5 intensity.
+
+```{r}
+# C3e) Two storms became Category 5 hurricanes, at least one storm making landfall at Category 5 intensity.
+
+category_five = group_by(filter(storms_in_2019, WMO_WIND > 137 & LANDFALL == 0), NAME)
+category_five
+
+```
+
+We need to take a look at the storms that were category 5 level intensity at landfall. This means that the wind speed of the hurricanes must be greater than 137 knots when the distance from land is 0. As such, I filtered the dataframe with these two parameters, WMO_WIND > 137 and LANDFALL == 0, to include just these storms. Next, a group_by function was applied with NAME as the parameter. These data manipulations yielded an empty tibble, showing that no hurricanes met these conditions which means that the given claim is false.
+
+Next, I made an animated map of storms in 2019 which displayed their trajectories. This process involved using the gganimate and map_packages loaded at the beginning of this project. I first created a variable called world_map to store a dataframe containing information about the world. This was used to plot a pictoral representation of a world map, using the ggplot and geom_polygon functions. Longitude represents the distance east/west of the prime meridian, a North-South reference line that passes through Greenwich, England. On the other hand, Latitude represents the distance north/south of the equator. To create the map, I input x = longitude and y = latitude as parameters for aes.
+
+To create a gif, or animation, for the hurricane trajectories, ggworld was passed in and added to the geom_point function with the variable hur19 as the data source. Once again, longitude was used as the x-axis and latitude as the y-axis. Size was set to WMO_WIND in order to depict storm strength, while each distinct storm was identified by color. Finally, the xlim and ylim functions were used to set the parameters for the graph, and after some trial-and-error, I found (-150, 50) for the x-axis and (-10, 90) for the y-axis to work well in depicting the data.
+
+
+```{r}
+world_map = map_data('world')
+ggworld = ggplot() + geom_polygon(data = world_map, aes(x = long, y = lat, group=group))
+hur_gif = ggworld + geom_point(data = hur19, aes(x = LON, y = LAT, size = WMO_WIND, color = NAME)) + xlim(c(-150, 50)) + ylim(c(-10, 90))
+hur_gif
+
+hur_gif + transition_time(ISO_TIME)+ labs(title= '{frame_time}') + ease_aes()
+
+#animate(hur_gif, fps = 10, renderer = gifski_renderer())
+#anim_save('hurricane2019.gif')
+
+```
